@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title> PDFView </title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.2.0/css/bootstrap.min.css">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.5/umd/popper.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.2.0/js/bootstrap.min.js"></script>
+    <style>
+        h1 {
+            margin-top: 5%;
+            margin-bottom: 5%;
+        }
+
+        .progress {
+            margin-top: 3%;
+            margin-bottom: 3%;
+        }
+
+        .viewer {
+            display: block;
+            background: #555;
+            margin: auto;
+            text-align: center;
+            margin-bottom: 2%;
+            max-height: 70vh;
+            overflow: auto;
+            
+        }
+
+        canvas {
+            margin-top: 2%;
+            margin-bottom: 2%;
+            border-radius: 0.5%;
+            box-shadow: 2px 2px 5px 6px #444;
+        }
+        .custom-file {
+            margin-bottom: 8px;
+        }
+        .title {
+            font-size: 30px;
+            margin-top: 12px;
+            margin-bottom: 12px;
+            font-weight: bold;
+        }
+        .progress {
+            display: none;
+            margin-top: 0px;
+            margin-bottom: 4px;
+        }
+        .status {
+            font: 110% Arial;
+            text-align: center;
+            display: none;
+            margin-bottom: 8px;
+        }
+        .custom-file-label {
+            margin-bottom: 6px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+  <div id="liveToast" class="toast hide" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header">
+      <img class="rounded me-2">
+      <strong class="me-auto">Tip</strong>
+      <small>right now</small>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body">
+      Please first <a href="#" onclick="document.getElementById('selector').click();$('.toast').toast('hide')">select a pdf file.</a>
+    </div>
+  </div>
+</div>
+    <script src="//mozilla.github.io/pdf.js/build/pdf.js"></script>
+
+    <div class=container>
+        <div class="title">PDFView - A simple pdf viewer</div>
+        <hr>
+        <div class="progress">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:1%" id="pb">1%</div>
+        </div>
+        <div class="status"></div>
+        <div class="form-con">
+            <label class="form-label" for="selector">Select pdf file</label>
+            <input type="file" id=selector accept=".pdf" class="form-control custom-file">
+        </div>
+        <div id=output class=viewer>
+
+        </div>
+    </div>
+    <script>
+        document.body.onload = function() {
+            $('.toast').toast('show')
+        }
+        document.querySelector('#selector').onchange = function() {
+            if(this.files && this.files[0]) {
+                if((this.files[0].size / 1024) / 1024 > 15) {
+                    alert("Too big file. You can upload files up to 15 MB")
+                } else {
+                    document.getElementById('output').innerHTML = ""
+                    var url = URL.createObjectURL(this.files[0]);
+                    var pdfjsLib = window["pdfjs-dist/build/pdf"]
+
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = '//mozilla.github.io/pdf.js/build/pdf.worker.js';
+
+                    var loadingTask = pdfjsLib.getDocument(url);
+
+                    loadingTask.promise.then(function(pdf) {
+                        var bar = document.getElementById('pb')
+                        bar.innerHTML = "1%"
+                        bar.style.width = "1%"
+                        $('.progress').slideDown()
+                        $('.status').slideDown()
+                        $('.status').html('Uploading your file...')
+                        console.log('PDF started loading...');
+                        var numPages = pdf.numPages;
+                        console.log("Pages: "+numPages)
+                        var currentPage = 1
+                        for(var e = 0; e < numPages; e++) {
+                            var canvas = document.createElement('canvas')
+                            canvas.setAttribute('id', 'page' + e)
+                            pdf.getPage(e + 1).then(function(page) {
+
+
+                                var scale = 1.5;
+                                var viewport = page.getViewport({
+                                    scale: scale
+                                });
+
+                                var canvas = document.createElement('canvas')
+                                canvas.setAttribute('class', 'page')
+                                document.getElementById('output').appendChild(canvas)
+                                var context = canvas.getContext('2d');
+                                canvas.height = viewport.height;
+                                canvas.width = viewport.width;
+
+                                var renderContext = {
+                                    canvasContext: context,
+                                    viewport: viewport
+                                };
+                                async function load() {
+                                    var renderTask = page.render(renderContext);
+                                    renderTask.promise.then(function() {
+                                        var progress = String(Math.floor(currentPage / numPages * 100)) + "%"
+                                        $('.status').html('Reading your file ('+currentPage+'/'+numPages+')')
+                                        console.log(progress);
+                                        currentPage += 1
+                                        bar.innerHTML = progress
+                                        bar.style.width = progress
+                                        if(currentPage - 1 == numPages) {
+                                            setTimeout(function() {
+                                                $('.progress').slideUp()
+                                                $('.status').slideUp()
+                                            }, 2000)
+                                        }
+                                    });
+                                }
+                                load()
+                            });
+                        }
+                    }, function(reason) {
+                        console.error(reason);
+                    });
+                }
+            }
+        }
+    </script>
+
+</body>
+
+</html>
